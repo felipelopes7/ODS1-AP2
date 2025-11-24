@@ -4,11 +4,32 @@ Segundo Trabalho Prático (AP2) da disciplina Oficina de Desenvolvimento de Sist
 
 ---
 
+**Equipe**
+
+- Aglison Balieiro Da Silva
+- Felipe Alves Lopes
+- Leonardo Melo Crispim
+- Oziel Bezerra de Lima
+
+---
+
 ## Objetivo do Sistema ##
 
 Este projeto implementa uma plataforma de recomendação de mangás baseada em Filtragem por Conteúdo (Content-Based Filtering).
 
 Este sistema analisa as características dos próprios mangás (como gênero, autor, tags e sinopse) para entender o perfil de gosto do utilizador. Se o utilizador avalia bem mangás de "Ação" e "Ninjas", o sistema recomendará outras obras que contenham essas mesmas palavras-chave e descrições similares, independentemente do que outros usuários pensam.
+
+## Cenário de Uso: Recomendação de Mangás
+
+**Por que recomendar mangás?**
+O mercado de mangás é vasto, com milhares de títulos lançados anualmente cobrindo dezenas de demografias (Shounen, Seinen, Shoujo) e temas. Leitores frequentemente têm dificuldade em descobrir obras novas que fujam dos títulos mais populares ("mainstream"). Um sistema de recomendação é essencial para conectar leitores a obras de nicho que correspondam aos seus gostos específicos de narrativa e estilo.
+
+**Atributos de Conteúdo Considerados:**
+Para realizar a filtragem, utilizamos os seguintes atributos diferenciadores extraídos do nosso catálogo (`items.csv`):
+* **Gênero/Categoria:** (ex: Shounen, Seinen, Romance).
+* **Tags:** Palavras-chave específicas (ex: "Ninja", "Cyberpunk", "Escolar").
+* **Autor:** Para identificar estilo de traço e narrativa.
+* **Sinopse:** Descrição textual que fornece o contexto semântico da obra.
 
 ## Tecnologias Utilizadas ##
 
@@ -153,3 +174,11 @@ F1-Score: Média harmônica entre Precision e Recall, oferecendo um balanço ger
 ├── requirements.txt     # Dependências do projeto
 └── README.md            # Documentação
 ```
+
+### Endpoints da API (Backend)
+O backend fornece as seguintes rotas documentadas (Swagger UI disponível em `/docs`):
+
+* `GET /`: Verifica status da API.
+* `GET /recomendar/{user_id}`: Retorna recomendações baseadas no perfil vetorial do usuário.
+* `GET /avaliar_acuracia/{user_id}`: Calcula Precision, Recall e F1 para um usuário específico.
+* `GET /avaliar_acuracia_geral`: Calcula a média de performance de todo o sistema.
