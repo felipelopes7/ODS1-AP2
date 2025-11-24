@@ -139,6 +139,7 @@ Recall: Dos itens que o utilizador gosta, quantos o sistema conseguiu encontrar?
 F1-Score: Média harmônica entre Precision e Recall, oferecendo um balanço geral da performance.
 
 ### Estrutura de Arquivos
+```bash
 /
 ├── backend/
 │   ├── app.py           # API FastAPI e rotas
@@ -149,3 +150,4 @@ F1-Score: Média harmônica entre Precision e Recall, oferecendo um balanço ger
 │   └── app_streamlit.py # Interface gráfica Streamlit
 ├── requirements.txt     # Dependências do projeto
 └── README.md            # Documentação
+```
