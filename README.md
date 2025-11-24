@@ -138,6 +138,8 @@ Recall: Dos itens que o utilizador gosta, quantos o sistema conseguiu encontrar?
 
 F1-Score: Média harmônica entre Precision e Recall, oferecendo um balanço geral da performance.
 
+---
+
 ### Estrutura de Arquivos
 ```bash
 /
