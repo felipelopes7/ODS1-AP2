@@ -1,105 +1,151 @@
-# Trabalho1-ODS1
+# *Trabalho ODS1 - AP2: Sistema de Recomendação de Mangás (Content-Based)* #
 
-**Primeiro Trabalho Prático** com o tema **"Sistema de Recomendação com Filtragem Colaborativa"** da disciplina **Oficina de Desenvolvimento de Sistemas 1**.
+Segundo Trabalho Prático (AP2) da disciplina Oficina de Desenvolvimento de Sistemas 1.
 
 ---
-## Objetivo do Sistema 
-O objetivo principal deste sistema é ser uma plataforma inteligente de recomendação de mangás. Utilizando o histórico de avaliações de cada usuário, a aplicação constrói um perfil de preferências detalhado. A partir desse perfil, nosso algoritmo analisa o banco de dados e sugere novos títulos com alta probabilidade de agradar ao leitor, garantindo uma descoberta de conteúdo personalizada e eficaz.
----
 
-## Criar e rodar o ambiente virtual
+## Objetivo do Sistema ##
 
-**Versão do Python:** 3.11.9  
-Qualquer versão **3.11.x** é compatível.  
-Para verificar a versão:
+Este projeto implementa uma plataforma de recomendação de mangás baseada em Filtragem por Conteúdo (Content-Based Filtering).
+
+Este sistema analisa as características dos próprios mangás (como gênero, autor, tags e sinopse) para entender o perfil de gosto do utilizador. Se o utilizador avalia bem mangás de "Ação" e "Ninjas", o sistema recomendará outras obras que contenham essas mesmas palavras-chave e descrições similares, independentemente do que outros usuários pensam.
+
+## Tecnologias Utilizadas ##
+
+- Linguagem: Python 3.11+
+
+- Backend: FastAPI
+
+- Frontend: Streamlit
+
+- Machine Learning / Processamento de Dados:
+
+- Scikit-learn: Para vetorização de texto (TF-IDF) e cálculo de similaridade (Cosseno).
+
+- Pandas & NumPy: Manipulação de dados e operações vetoriais.
+
+## Instalação e Execução ##
+
+### 1. Configurar o Ambiente Virtual
+
+*Certifique-se de ter o Python 3.11+ instalado.*
+
+Verificar Versão
 
 ```bash
 python --version
 ```
 
-***Criando o Ambiente Virtual***
+Criar Ambiente Virtual
 
 ```bash
 python -m venv venv
 ```
- 
-***Ativando o Ambiente Virtual***
 
-Windows: 
+Ativat Ambiente Virtual
 
 ```bash
+# Windows:
 venv\Scripts\activate
-```
 
-Linux: 
-
-```bash
+# Linux/Mac:
 source venv/bin/activate
 ```
 
-Se estiver vendo um (venv), quer dizer que ele está funcionando
-
-***Baixando os requisitos***
+### 2. Instalar Dependências
 
 ```bash
 pip install -r requirements.txt
 ```
 
-***Desativando o Ambiente Virtual***
+### 3. Rodar a Aplicação
 
-```bash
-deactivate
-```
+*O sistema é dividido em duas partes que devem rodar simultaneamente em terminais diferentes (ambos com o venv ativado).*
 
-## Execução
-
-**Backend - FastAPI**
-
-***Não é preciso ativar o ambiente virtual***
+**Terminal 1: Backend (API)**
 
 ```bash
 cd backend
 uvicorn app:app --reload
 ```
 
-**Frontend - Streamlit**
+*O backend iniciará em http://127.0.0.1:8000 e carregará a matriz de inteligência TF-IDF automaticamente.*
 
-***Com o ambiente virtual ativado***
+**Terminal 2: Frontend (Interface)**
 
 ```bash
 cd frontend
 streamlit run app_streamlit.py
 ```
 
-***Para parar de executar o frontend ou backend, basta apertar CTRL+C no terminal***
+*O navegador abrirá automaticamente com a aplicação.*
 
-## Explicação da Lógica de Recomendação
+## Lógica de Recomendação (Como Funciona)
 
-O sistema utiliza uma abordagem de **Filtragem Colaborativa Item-Item (Item-Based Collaborative Filtering)**. A lógica principal está implementada no arquivo `recommender.py` e segue os seguintes passos:
+*A lógica central está no arquivo backend/recommender.py e segue três etapas principais:*
 
-1.  **Matriz Usuário-Item**: Primeiramente, o sistema constrói uma matriz onde as linhas representam os usuários e as colunas representam os mangás (itens). O valor em cada célula é a nota que um usuário deu a um mangá específico. Células vazias (itens não avaliados) são preenchidas com 0.
-2.  **Cálculo de Similaridade entre Itens**: Em seguida, o sistema calcula uma matriz de similaridade entre todos os mangás. Isso é feito para determinar o quão "parecido" um mangá é de outro, com base nas notas que eles receberam de todos os usuários. Se muitos usuários que gostaram de "Naruto" também gostaram de "Bleach", por exemplo, esses dois itens terão uma alta similaridade.
-3.  **Geração de Recomendações**: Para gerar recomendações para um usuário específico, o sistema:
-    * Identifica os mangás que o usuário ainda **não avaliou**.
-    * Para cada mangá não avaliado, ele calcula uma "nota prevista". Essa nota é uma média ponderada das notas que o usuário deu para *outros* mangás. Os pesos nessa média são as similaridades entre o mangá não avaliado e cada mangá que o usuário já avaliou.
-    * Por fim, o sistema ordena os mangás não avaliados pela maior nota prevista e retorna os melhores classificados (`top_n`) como recomendação.
+### 1. Vetorização dos Itens (TF-IDF)
 
-## Justificativa da Métrica de Similaridade Usada
+O sistema cria uma "sopa de metadados" para cada mangá, concatenando as seguintes informações:
 
-A métrica de similaridade implementada é a **Similaridade de Cosseno (Cosine Similarity)**.
+- Categoria (Gênero)
 
-* **O que é?** A similaridade de cosseno mede o cosseno do ângulo entre dois vetores. No nosso caso, cada mangá pode ser representado como um vetor contendo todas as notas que recebeu dos usuários. A métrica, então, calcula o quão "próximos" esses vetores estão em termos de direção.
-* **Por que foi usada?** Essa é uma das métricas mais tradicionais e eficazes para sistemas de recomendação. Ela é particularmente útil para encontrar itens com padrões de avaliação semelhantes, independentemente da magnitude das notas. Por exemplo, se um grupo de usuários tende a dar notas altas para os mesmos dois mangás, a similaridade de cosseno entre eles será alta. É uma abordagem robusta e computacionalmente eficiente para capturar a relação de gostos entre os itens.
+- Autor
 
-## Cálculo e Análise da Acurácia
+- Ano
 
-A acurácia do modelo é avaliada através de uma simulação para um usuário específico, conforme implementado na função `evaluate_accuracy`.
+- Título
 
-1.  **Divisão Treino-Teste**: As avaliações de um usuário são divididas aleatoriamente em dois conjuntos: um de **treino** e um de **teste**. Para garantir que o resultado seja sempre o mesmo para um mesmo usuário, a divisão é feita com um estado aleatório fixo (`random_state=42`).
-2.  **Simulação**: O sistema "esconde" o conjunto de teste e gera recomendações para o usuário usando apenas os dados do conjunto de treino.
-3.  **Verificação (Hits)**: Em seguida, ele verifica quais itens do conjunto de teste foram avaliados positivamente pelo usuário (nota maior ou igual a 4). Estes são considerados os "gabaritos" ou o que o modelo deveria ter acertado.
-4.  **Cálculo da Métrica**: A acurácia é calculada como a quantidade de itens que aparecem **tanto** na lista de recomendações **quanto** na lista de "favoritos" do teste (os *hits*), dividida pelo número total de recomendações geradas.
+- Tags (Ex: "Ninja", "Espadas", "Vampiros")
 
-* **Análise**: Essa métrica, similar à **Precisão**, avalia o quão relevantes foram as recomendações. Um resultado de **20%**, por exemplo, significa que 1 a cada 5 itens recomendados era algo que o usuário comprovadamente gostava (com base nos dados de teste).
+- Sinopse
 
-Ao realizar a primeira avaliação formal do nosso sistema de recomendação, chegamos a uma acurácia geral de 7,37%. Embora este número possa parecer baixo à primeira vista, ele é fundamental como um ponto de partida (baseline) e nos forneceu um diagnóstico muito claro sobre o estado atual do modelo. A nossa análise indica que a principal causa para este resultado é um desafio clássico em sistemas de recomendação: a esparsidade dos dados. Isso significa que, com o número ainda limitado de avaliações por usuário, o algoritmo tem dificuldade em encontrar padrões robustos e identificar outros usuários com gostos similares de forma eficaz. Dessa forma, este número não é visto como uma falha, mas sim como um diagnóstico preciso que nos aponta o caminho para as próximas otimizações. Com base nisso, os próximos passos já estão definidos, começando pela implementação de uma abordagem híbrida que utilizará metadados dos mangás (gênero, autor e tags) para contornar a falta de avaliações. Adicionalmente, planejo explorar algoritmos mais avançados, como os de Fatoração de Matrizes (SVD), que são projetados para lidar com dados esparsos. Estou confiante de que a implementação dessas melhorias resultará em um aumento significativo na acurácia e na qualidade das recomendações futuras.
+Em seguida, utiliza o TF-IDF (Term Frequency-Inverse Document Frequency) para converter esse texto em vetores numéricos. Isso permite que o sistema entenda matematicamente a importância de cada palavra (por exemplo, a palavra "Ninja" será muito relevante para diferenciar Naruto de um romance escolar).
+
+### 2. Construção do Perfil do Utilizador
+
+O sistema analisa o histórico de avaliações do utilizador:
+
+Seleciona todos os mangás que o utilizador avaliou com nota igual ou superior a 3 (considerados como "Gostei").
+
+Calcula um vetor médio desses mangás. Esse vetor resultante representa o "gosto médio" do utilizador no espaço vetorial.
+
+### 3. Geração de Recomendações (Similaridade de Cosseno)
+
+Para recomendar:
+
+O sistema calcula a Similaridade de Cosseno entre o Vetor do Perfil do Utilizador e os vetores de todos os mangás do catálogo.
+
+Os mangás com maior similaridade (ângulos mais próximos) são retornados como recomendação, excluindo aqueles que o utilizador já viu.
+
+## Métricas e Avaliação de Acurácia
+
+O sistema possui uma rota dedicada (/avaliar_acuracia) para medir a performance das recomendações.
+
+**Metodologia de Teste:**
+
+As avaliações de um utilizador são divididas em Treino (50%) e Teste (50%).
+
+O sistema gera recomendações usando apenas os dados de Treino.
+
+Verifica-se se os itens recomendados aparecem na lista de Teste com avaliações positivas (Nota >= 3).
+
+**Métricas Calculadas:**
+
+Precision: Qual a porcentagem das recomendações geradas que o utilizador realmente gostou?
+
+Recall: Dos itens que o utilizador gosta, quantos o sistema conseguiu encontrar?
+
+F1-Score: Média harmônica entre Precision e Recall, oferecendo um balanço geral da performance.
+
+### Estrutura de Arquivos
+/
+├── backend/
+│   ├── app.py           # API FastAPI e rotas
+│   ├── recommender.py   # Lógica do Content-Based Filtering
+│   ├── items.csv        # Catálogo de mangás com metadados
+│   └── ratings.csv      # Histórico de avaliações
+├── frontend/
+│   └── app_streamlit.py # Interface gráfica Streamlit
+├── requirements.txt     # Dependências do projeto
+└── README.md            # Documentação
