@@ -38,6 +38,12 @@ API_URL = "http://127.0.0.1:8000"
 def load_data():
     """Carrega os dados dos arquivos CSV, com cache para performance."""
     items = pd.read_csv(ITEMS_CSV)
+    
+    # Tratamento para garantir que a coluna tags exista e seja string (caso o CSV mude)
+    if 'tags' not in items.columns:
+        items['tags'] = ''
+    items['tags'] = items['tags'].fillna('')
+    
     if os.path.exists(RATINGS_CSV):
         ratings = pd.read_csv(RATINGS_CSV)
         for col in ["user_id", "item_id", "rating"]:
@@ -71,7 +77,6 @@ def set_selected_manga_and_rerun(item_id):
 
 def display_catalog():
     st.header(" Catálogo de Mangás")
-    # ... (código do catálogo permanece o mesmo)
     search_query = st.text_input("Buscar por título", key="search_input")
     categories = ["Todas"] + sorted(items_with_avg["category"].unique().tolist())
     selected_category = st.selectbox("Filtrar por Categoria", options=categories, key="category_select")
@@ -158,15 +163,17 @@ def display_add_rating():
 
 def display_recommendations():
     """Renderiza a página de geração de recomendações."""
-    st.header(" Gerar Recomendações")
+    st.header(" Gerar Recomendações (Por Conteúdo)")
+    st.info("As recomendações agora são baseadas no seu perfil de gosto (Gênero, Autor, Tags).")
+    
     if ratings_df.empty:
-        st.info("Adicione avaliações para gerar recomendações.")
+        st.warning("Adicione avaliações para gerar recomendações.")
     else:
         user_ids = sorted(ratings_df["user_id"].unique())
         selected_user = st.selectbox("Escolha o ID do Usuário", options=user_ids)
         st.write("**Quantidade de Recomendações:** 5")
         if st.button("Gerar Recomendações"):
-            with st.spinner('Buscando recomendações...'):
+            with st.spinner('Analisando perfil do usuário e comparando metadados...'):
                 try:
                     response = requests.get(f"{API_URL}/recomendar/{selected_user}")
                     response.raise_for_status() 
@@ -178,15 +185,17 @@ def display_recommendations():
                         for i, (_, row) in enumerate(rec_df.iterrows()):
                             with cols[i]:
                                 st.image(row['image_url'], caption=row['title'], use_container_width=True)
-                                st.write(f"**Score:** {row['score']:.2f}")
+                                # Exibe a similaridade (0 a 1)
+                                st.write(f"**Similaridade:** {row['score']:.2f}")
+                                st.caption(f"{row['category']}")
                     else:
-                        st.warning("Nenhuma recomendação encontrada para este usuário.")
+                        st.warning("Nenhuma recomendação encontrada. Tente avaliar mais mangás positivamente (nota >= 4).")
                 except requests.RequestException as e:
                     st.error(f"Erro de conexão com o backend: {e}")
 
 def display_accuracy():
     """Renderiza a página de avaliação de performance (Precision, Recall, F1)."""
-    st.header(" Avaliar Performance")
+    st.header(" Avaliar Performance (Métricas)")
     
     # Verifica se há avaliações
     if ratings_df.empty or ratings_df['user_id'].nunique() < 1:
@@ -195,7 +204,7 @@ def display_accuracy():
         st.subheader("Avaliação por Usuário")
         user_ids = sorted(ratings_df["user_id"].unique())
         selected_user = st.selectbox("Escolha um usuário", options=user_ids)
-        st.write("**Parâmetros:** Consideramos 'relevante' notas >= 4.")
+        st.write("**Parâmetros:** Consideramos 'relevante' notas >= 4. Divisão Treino/Teste: 70/30.")
         
         if st.button("Calcular Métricas do Usuário"):
             with st.spinner("Calculando..."):
@@ -207,14 +216,13 @@ def display_accuracy():
                     if "message" in result:
                         st.warning(result["message"])
                     else:
-                        # --- MUDANÇA AQUI: Exibe as 3 métricas ---
                         col1, col2, col3 = st.columns(3)
                         col1.metric("Precision", f"{result.get('precision', 0):.2%}", help="Dos recomendados, quantos o usuário curtiu?")
                         col2.metric("Recall", f"{result.get('recall', 0):.2%}", help="Dos que o usuário curte, quantos encontramos?")
-                        col3.metric("F1-Score", f"{result.get('f1_score', 0):.2%}", help="Média harmônica")
+                        col3.metric("F1-Score", f"{result.get('f1_score', 0):.2%}", help="Média harmônica entre Precision e Recall")
                         
                         st.markdown("---")
-                        st.write(f"**Itens de teste (gostou):** {result.get('test_liked', [])}")
+                        st.write(f"**Itens de teste (Gabarito):** {result.get('relevant_in_test', [])}")
                         st.write(f"**Itens recomendados:** {result.get('recommended', [])}")
                         st.write(f"**Acertos (Hits):** {result.get('hits', 0)}")
                         
@@ -225,7 +233,7 @@ def display_accuracy():
         st.subheader("Avaliação Geral do Modelo")
         
         if st.button("Calcular Médias Globais"):
-            with st.spinner("Calculando acurácia para todos os usuários..."):
+            with st.spinner("Calculando métricas para todos os usuários..."):
                 try:
                     response = requests.get(f"{API_URL}/avaliar_acuracia_geral")
                     response.raise_for_status()
@@ -234,11 +242,11 @@ def display_accuracy():
                     if "message" in result:
                         st.warning(result["message"])
                     else:
-                        # --- MUDANÇA AQUI: Médias Globais ---
                         c1, c2, c3 = st.columns(3)
                         c1.metric("Média Precision", f"{result.get('mean_precision', 0):.2%}")
                         c2.metric("Média Recall", f"{result.get('mean_recall', 0):.2%}")
-                        c3.metric("Média F1", f"{result.get('mean_f1', 0):.2%}")
+                        # CORREÇÃO AQUI: A chave correta no backend é mean_f1_score
+                        c3.metric("Média F1", f"{result.get('mean_f1_score', 0):.2%}")
                         
                         st.write(f"**Total de usuários avaliados:** {result.get('users_evaluated', 0)}")
                 except requests.RequestException as e:
@@ -261,6 +269,14 @@ def display_manga_details(item_id):
         st.write(f"**Autor:** {selected_item['author']}")
         st.write(f"**Ano:** {selected_item['year']}")
         st.write(f"**Categoria:** {selected_item['category']}")
+        
+        # NOVIDADE: Mostra as tags (essenciais para Content-Based)
+        if 'tags' in selected_item and selected_item['tags']:
+            tags_list = selected_item['tags'].split(',')
+            st.write("**Tags:**")
+            # Exibe tags como pequenas "pílulas" ou texto formatado
+            st.markdown(" ".join([f"`{tag.strip()}`" for tag in tags_list]))
+            
         st.write(f"**Média:** ⭐ {selected_item['avg_rating']:.2f}" if selected_item['avg_rating'] > 0 else "Sem avaliações")
 
     st.markdown("---")
@@ -292,6 +308,7 @@ if 'selected_manga_id' in st.session_state and st.session_state.selected_manga_i
 else:
     with st.sidebar:
         st.title("MangáRec")
+        st.caption("Filtragem Baseada em Conteúdo") # Caption atualizada
         selected_page = option_menu(
             menu_title="Menu",
             options=["Catálogo", "Adicionar Avaliação", "Recomendações", "Acurácia"],

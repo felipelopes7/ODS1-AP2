@@ -3,176 +3,176 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-def create_content_matrix(items_df: pd.DataFrame):
+# Variáveis globais para armazenar a matriz e o vetorizador após a inicialização
+tfidf_matrix = None
+item_indices_map = {}
+
+def prepare_data_and_vectorize(items_df: pd.DataFrame):
     """
-    Cria a matriz de características dos itens usando TF-IDF.
-    Junta Título, Categoria, Tags e Sinopse em um único 'sopão' de palavras.
+    Passo 1: Preparação dos Dados e Vetorização.
+    Cria a matriz TF-IDF baseada no conteúdo e preenche as globais.
     """
-    # Garante que não há valores nulos nos textos
-    items_df['tags'] = items_df['tags'].fillna('')
-    items_df['synopsis'] = items_df['synopsis'].fillna('')
+    global tfidf_matrix, item_indices_map
+    
+    # 1. GARANTIR QUE A COLUNA TAGS EXISTA
+    if 'tags' not in items_df.columns:
+        items_df['tags'] = ''
+
+    # Limpeza de dados
     items_df['category'] = items_df['category'].fillna('')
-    
-    # Cria o "sopão" de palavras (Soup) para cada item
-    # Damos peso extra para Tags e Categoria repetindo-as
-    items_df['soup'] = (
+    items_df['author'] = items_df['author'].fillna('')
+    items_df['title'] = items_df['title'].fillna('')
+    items_df['year'] = items_df['year'].astype(str).fillna('')
+    items_df['tags'] = items_df['tags'].fillna('')
+
+    # Criando a "Sopa de Metadados"
+    items_df['metadata_soup'] = (
+        items_df['category'] + " " + 
+        items_df['author'] + " " + 
+        items_df['year'] + " " + 
         items_df['title'] + " " + 
-        items_df['category'] + " " + items_df['category'] + " " + 
-        items_df['tags'] + " " + items_df['tags'] + " " + 
-        items_df['synopsis']
+        items_df['tags']
     )
-    
-    # Cria a matriz TF-IDF
-    # stop_words='english' remove palavras comuns (the, a, in) se o texto for inglês.
-    # Se for português, precisaria de uma lista customizada, mas 'english' não atrapalha muito.
+
+    # Vetorização
     tfidf = TfidfVectorizer(stop_words='english')
-    tfidf_matrix = tfidf.fit_transform(items_df['soup'])
+    tfidf_matrix = tfidf.fit_transform(items_df['metadata_soup'])
+    
+    # Cria um mapa para achar rapidamente o índice da matriz dado um item_id
+    item_indices_map = pd.Series(items_df.index, index=items_df['item_id']).to_dict()
+    
     return tfidf_matrix
 
-def get_user_profile(user_id: int, ratings_df: pd.DataFrame, tfidf_matrix):
+def build_user_profile(user_id: int, ratings_df: pd.DataFrame) -> np.ndarray:
     """
-    Cria o perfil do usuário baseado na média dos vetores dos itens que ele gostou.
-    Consideramos "gostou" notas >= 4.
+    Passo 2: Constrói o perfil do usuário (Vetor Médio).
     """
-    user_ratings = ratings_df[ratings_df['user_id'] == user_id]
+    # Filtra itens que o usuário gostou
+    user_likes = ratings_df[(ratings_df['user_id'] == user_id) & (ratings_df['rating'] >= 4)]
     
-    # Filtra apenas itens que o usuário avaliou bem (>= 4)
-    liked_items = user_ratings[user_ratings['rating'] >= 4]
-    
-    if liked_items.empty:
-        return None
-    
-    # Pega os índices desses itens na matriz original
-    # Assumindo que item_id começa em 1 e os índices da matriz começam em 0:
-    liked_indices = liked_items['item_id'].values - 1 
-    
-    # Filtra índices válidos (caso haja IDs no ratings que não estão no items)
-    valid_indices = [i for i in liked_indices if i < tfidf_matrix.shape[0]]
-    
-    if not valid_indices:
+    if user_likes.empty:
         return None
 
-    # Calcula o vetor médio do usuário (User Profile)
-    user_profile = tfidf_matrix[valid_indices].mean(axis=0)
-    return user_profile
+    # Pega os índices desses itens na matriz TF-IDF
+    liked_indices = []
+    for item_id in user_likes['item_id']:
+        if item_id in item_indices_map:
+            liked_indices.append(item_indices_map[item_id])
+            
+    if not liked_indices:
+        return None
+
+    # Calcula a média dos vetores dos itens curtidos
+    user_profile = np.mean(tfidf_matrix[liked_indices], axis=0)
+    
+    return np.asarray(user_profile)
 
 def get_recommendations(user_id: int, items_df: pd.DataFrame, ratings_df: pd.DataFrame) -> list:
     """
-    Gera recomendações baseadas na similaridade entre o perfil do usuário e os itens.
+    Passo 3: Gera recomendações baseadas na similaridade entre o Perfil do Usuário e os Itens.
     """
-    # 1. Prepara a matriz de conteúdo
-    tfidf_matrix = create_content_matrix(items_df)
-    
-    # 2. Cria o perfil do usuário
-    user_profile = get_user_profile(user_id, ratings_df, tfidf_matrix)
+    if tfidf_matrix is None:
+        # Se por algum motivo a matriz não foi gerada, gera agora
+        prepare_data_and_vectorize(items_df)
+
+    # 1. Constrói o perfil
+    user_profile = build_user_profile(user_id, ratings_df)
     
     if user_profile is None:
-        return [] # Usuário não tem avaliações positivas suficientes para criar perfil
-    
-    # 3. Calcula similaridade (Cosseno) entre o perfil do usuário e TODOS os itens
-    # user_profile é (1, n_features) e tfidf_matrix é (n_items, n_features)
+        return [] 
+
+    # 2. Calcula similaridade (Perfil vs Todos os Itens)
     cosine_sim = cosine_similarity(user_profile, tfidf_matrix)
     
-    # Transforma em array simples
-    scores = cosine_sim[0]
+    sim_scores = list(enumerate(cosine_sim[0]))
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
     
-    # 4. Remove itens que o usuário JÁ viu
-    watched_items = ratings_df[ratings_df['user_id'] == user_id]['item_id'].values
-    # Ajusta índices (item_id 1 = índice 0)
-    watched_indices = watched_items - 1
+    watched_items = set(ratings_df[ratings_df['user_id'] == user_id]['item_id'])
     
-    # Zera o score dos itens já vistos para não recomendar de novo
-    for idx in watched_indices:
-        if 0 <= idx < len(scores):
-            scores[idx] = -1
-
-    # 5. Pega os Top 5
-    top_indices = scores.argsort()[::-1][:5]
-    
-    results = []
-    for idx in top_indices:
-        if scores[idx] <= 0: continue # Ignora se a similaridade for zero ou item já visto
+    recommendations = []
+    for idx, score in sim_scores:
+        real_item_id = items_df.iloc[idx]['item_id']
         
-        row = items_df.iloc[idx]
-        results.append({
-            "item_id": int(row['item_id']),
-            "title": row['title'],
-            "category": row['category'],
-            "score": float(scores[idx]), # Score agora é a similaridade (0 a 1)
-            "tags": row['tags'] # Adicionei tags para mostrar no frontend se quiser
-        })
-        
-    return results
+        if real_item_id not in watched_items:
+            row = items_df.iloc[idx]
+            recommendations.append({
+                "item_id": int(real_item_id),
+                "title": row['title'],
+                "category": row['category'],
+                "score": float(score)
+            })
+            
+        if len(recommendations) >= 5: # Top 5
+            break
+            
+    return recommendations
 
 def evaluate_accuracy(user_id: int, items_df: pd.DataFrame, ratings_df: pd.DataFrame) -> dict:
     """
-    Calcula Precision, Recall e F1-Score para um usuário.
+    Avalia o modelo calculando Precision, Recall e F1-Score.
     """
+    if tfidf_matrix is None:
+        prepare_data_and_vectorize(items_df)
+
     user_ratings = ratings_df[ratings_df['user_id'] == user_id]
     
-    # Precisamos de itens suficientes para dividir em treino e teste
-    positive_ratings = user_ratings[user_ratings['rating'] >= 4]
-    if len(positive_ratings) < 2:
-        return {"user_id": user_id, "message": "Usuário precisa de pelo menos 2 avaliações positivas (>=4) para o teste."}
+    if len(user_ratings[user_ratings['rating'] >= 4]) < 2:
+        return {"user_id": user_id, "message": "Poucas avaliações positivas para teste."}
 
-    # Divisão Treino/Teste (Garante que o teste tenha pelo menos 1 item positivo)
-    test_size = max(1, int(len(positive_ratings) * 0.3))
-    test_likes = positive_ratings.sample(test_size, random_state=42)
+    # Divisão Treino/Teste
+    test_items = user_ratings.sample(frac=0.3, random_state=42)
+    train_items = user_ratings.drop(test_items.index)
     
-    # O treino é tudo o que NÃO está no teste (inclui notas baixas e as altas restantes)
-    train_ratings = user_ratings.drop(test_likes.index)
-    
-    # Simula o sistema com os dados de treino
-    # Importante: passamos train_ratings como se fosse o histórico completo do usuário
-    recs = get_recommendations(user_id, items_df, train_ratings)
+    train_df = pd.concat([ratings_df[ratings_df['user_id'] != user_id], train_items])
+
+    recs = get_recommendations(user_id, items_df, train_df)
     
     recommended_ids = {r['item_id'] for r in recs}
-    test_liked_ids = set(test_likes['item_id'].values)
+    relevant_items = set(test_items[test_items['rating'] >= 4]['item_id'])
     
-    # Cálculo das métricas
-    hits = len(recommended_ids & test_liked_ids)
-    
-    # Precision: Dos recomendados, quantos eram bons? (Hits / Total Recomendado)
-    precision = hits / len(recs) if len(recs) > 0 else 0
-    
-    # Recall: Dos que o usuário gostava (teste), quantos eu achei? (Hits / Total no Teste)
-    recall = hits / len(test_liked_ids) if len(test_liked_ids) > 0 else 0
-    
-    # F1-Score: Média harmônica
-    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+    if not relevant_items:
+         return {"user_id": user_id, "message": "Não há itens relevantes no conjunto de teste."}
 
+    hits = len(recommended_ids & relevant_items)
+    
+    precision = hits / len(recommended_ids) if len(recommended_ids) > 0 else 0.0
+    recall = hits / len(relevant_items) if len(relevant_items) > 0 else 0.0
+    
+    if (precision + recall) > 0:
+        f1_score = 2 * (precision * recall) / (precision + recall)
+    else:
+        f1_score = 0.0
+        
     return {
         "user_id": user_id,
-        "precision": precision,
-        "recall": recall,
-        "f1_score": f1,
+        "precision": round(precision, 4),
+        "recall": round(recall, 4),
+        "f1_score": round(f1_score, 4),
         "hits": hits,
         "recommended": list(recommended_ids),
-        "test_liked": list(test_liked_ids)
+        "relevant_in_test": list(relevant_items)
     }
 
 def calculate_overall_accuracy(items_df: pd.DataFrame, ratings_df: pd.DataFrame) -> dict:
-    """
-    Calcula a média das métricas para todos os usuários.
-    """
+    if tfidf_matrix is None:
+        prepare_data_and_vectorize(items_df)
+        
     unique_users = ratings_df["user_id"].unique()
-    precisions = []
-    recalls = []
-    f1s = []
+    metrics = {"precision": [], "recall": [], "f1_score": []}
 
     for user_id in unique_users:
         result = evaluate_accuracy(user_id, items_df, ratings_df)
-        if "precision" in result: # Verifica se calculou com sucesso
-            precisions.append(result["precision"])
-            recalls.append(result["recall"])
-            f1s.append(result["f1_score"])
+        if "f1_score" in result:
+            metrics["precision"].append(result["precision"])
+            metrics["recall"].append(result["recall"])
+            metrics["f1_score"].append(result["f1_score"])
 
-    if not precisions:
-        return {"message": "Nenhum usuário apto para cálculo de métricas."}
+    if not metrics["f1_score"]:
+        return {"message": "Não foi possível calcular métricas para nenhum usuário."}
 
     return {
-        "mean_precision": sum(precisions) / len(precisions),
-        "mean_recall": sum(recalls) / len(recalls),
-        "mean_f1": sum(f1s) / len(f1s),
-        "users_evaluated": len(precisions)
+        "mean_precision": sum(metrics["precision"]) / len(metrics["precision"]),
+        "mean_recall": sum(metrics["recall"]) / len(metrics["recall"]),
+        "mean_f1_score": sum(metrics["f1_score"]) / len(metrics["f1_score"]),
+        "users_evaluated": len(metrics["f1_score"])
     }
