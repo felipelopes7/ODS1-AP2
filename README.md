@@ -45,6 +45,24 @@ Para realizar a filtragem, utilizamos os seguintes atributos diferenciadores ext
 
 - Pandas & NumPy: Manipulação de dados e operações vetoriais.
 
+---
+
+### Estrutura de Arquivos
+```bash
+/
+├── backend/
+│   ├── app.py           # API FastAPI e rotas
+│   ├── recommender.py   # Lógica do Content-Based Filtering
+│   ├── items.csv        # Catálogo de mangás com metadados
+│   └── ratings.csv      # Histórico de avaliações
+├── frontend/
+│   └── app_streamlit.py # Interface gráfica Streamlit
+├── requirements.txt     # Dependências do projeto
+└── README.md            # Documentação
+```
+
+---
+
 ## Instalação e Execução ##
 
 ### 1. Configurar o Ambiente Virtual
@@ -101,6 +119,18 @@ streamlit run app_streamlit.py
 
 *O navegador abrirá automaticamente com a aplicação.*
 
+---
+
+### Endpoints da API (Backend)
+O backend fornece as seguintes rotas documentadas (Swagger UI disponível em `/docs`):
+
+* `GET /`: Verifica status da API.
+* `GET /recomendar/{user_id}`: Retorna recomendações baseadas no perfil vetorial do usuário.
+* `GET /avaliar_acuracia/{user_id}`: Calcula Precision, Recall e F1 para um usuário específico.
+* `GET /avaliar_acuracia_geral`: Calcula a média de performance de todo o sistema.
+
+---
+
 ## Detalhes da Implementação (O Algoritmo)
 
 A lógica de recomendação reside no arquivo backend/recommender.py e foi construída seguindo os princípios de Processamento de Linguagem Natural (NLP) e Álgebra Linear.
@@ -143,40 +173,18 @@ Para gerar a lista final:
 
 **Metodologia de Teste:**
 
-As avaliações de um utilizador são divididas em Treino (50%) e Teste (50%).
+- As avaliações de um utilizador são divididas em Treino (50%) e Teste (50%).
 
-O sistema gera recomendações usando apenas os dados de Treino.
+- O sistema gera recomendações usando apenas os dados de Treino.
 
-Verifica-se se os itens recomendados aparecem na lista de Teste com avaliações positivas (Nota >= 3).
+- Verifica-se se os itens recomendados aparecem na lista de Teste com avaliações positivas (Nota >= 3).
 
 **Métricas Calculadas:**
 
-Precision: Qual a porcentagem das recomendações geradas que o utilizador realmente gostou?
+- Precision: Qual a porcentagem das recomendações geradas que o utilizador realmente gostou?
 
-Recall: Dos itens que o utilizador gosta, quantos o sistema conseguiu encontrar?
+- Recall: Dos itens que o utilizador gosta, quantos o sistema conseguiu encontrar?
 
-F1-Score: Média harmônica entre Precision e Recall, oferecendo um balanço geral da performance.
+- F1-Score: Média harmônica entre Precision e Recall, oferecendo um balanço geral da performance.
 
 ---
-
-### Estrutura de Arquivos
-```bash
-/
-├── backend/
-│   ├── app.py           # API FastAPI e rotas
-│   ├── recommender.py   # Lógica do Content-Based Filtering
-│   ├── items.csv        # Catálogo de mangás com metadados
-│   └── ratings.csv      # Histórico de avaliações
-├── frontend/
-│   └── app_streamlit.py # Interface gráfica Streamlit
-├── requirements.txt     # Dependências do projeto
-└── README.md            # Documentação
-```
-
-### Endpoints da API (Backend)
-O backend fornece as seguintes rotas documentadas (Swagger UI disponível em `/docs`):
-
-* `GET /`: Verifica status da API.
-* `GET /recomendar/{user_id}`: Retorna recomendações baseadas no perfil vetorial do usuário.
-* `GET /avaliar_acuracia/{user_id}`: Calcula Precision, Recall e F1 para um usuário específico.
-* `GET /avaliar_acuracia_geral`: Calcula a média de performance de todo o sistema.
